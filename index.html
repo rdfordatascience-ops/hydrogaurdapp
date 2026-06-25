@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HydroGuard | Real-Time Water Quality Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #080c14;
+            --card-bg: rgba(21, 30, 47, 0.7);
+            --card-border: rgba(43, 60, 93, 0.5);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --primary: #0ea5e9;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(239, 68, 68, 0.05) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(12px);
+            background: rgba(8, 12, 20, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 2.2rem;
+            height: 2.2rem;
+            background: linear-gradient(135deg, var(--primary), var(--success));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            background: linear-gradient(to right, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .status-pill {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+            padding: 0.375rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px var(--success); }
+            100% { transform: scale(0.9); opacity: 0.6; }
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .station-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .station-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(8px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .station-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+            transition: background 0.3s ease;
+        }
+
+        .station-card.contaminated::before {
+            background: var(--danger);
+        }
+
+        .station-card.normal::before {
+            background: var(--success);
+        }
+
+        .station-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(14, 165, 233, 0.4);
+            box-shadow: 0 12px 30px rgba(8, 12, 20, 0.5);
+        }
+
+        .station-card.contaminated:hover {
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .station-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1.25rem;
+        }
+
+        .station-title h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+
+        .station-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+        }
+
+        .alert-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .alert-badge.normal {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .alert-badge.contaminated {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            animation: flash-red 1s infinite alternate;
+        }
+
+        @keyframes flash-red {
+            0% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.2); }
+            100% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
+        }
+
+        .metrics-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .metric-box {
+            background: rgba(8, 12, 20, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: baseline;
+            gap: 0.25rem;
+        }
+
+        .metric-unit {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .metric-box.danger .metric-value {
+            color: var(--danger);
+        }
+
+        .station-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 0.75rem;
+        }
+
+        .station-coords {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .station-time {
+            font-style: italic;
+        }
+
+        .dashboard-body {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-body {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(8, 12, 20, 0.5);
+            padding: 0.25rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+
+        .feed-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 480px;
+        }
+
+        .feed-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+            flex-grow: 1;
+        }
+
+        /* Custom Scrollbar */
+        .feed-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .feed-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .feed-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        .feed-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .feed-item {
+            background: rgba(8, 12, 20, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            font-size: 0.8rem;
+            animation: slide-in 0.25s ease-out;
+        }
+
+        @keyframes slide-in {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .feed-item-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+        }
+
+        .feed-item.danger {
+            border-left: 3px solid var(--danger);
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .feed-item.success {
+            border-left: 3px solid var(--success);
+            background: rgba(16, 185, 129, 0.03);
+        }
+
+        .feed-item-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .feed-item-detail {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+        }
+
+        .feed-val {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        .feed-val.highlight {
+            color: var(--danger);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">H</div>
+            <div class="logo-text">
+                <h1>HydroGuard</h1>
+                <p>Real-Time Bio-Sensor Stream</p>
+            </div>
+        </div>
+        <div class="status-pill">
+            <div class="pulse-dot"></div>
+            <span>LIVE MONITORING</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Station Cards -->
+        <div class="station-grid">
+            <!-- Varthur Card -->
+            <div id="card-SENS-BLR-01" class="station-card normal">
+                <div class="station-header">
+                    <div class="station-title">
+                        <h3>Varthur Intake Main</h3>
+                        <span class="station-id">SENS-BLR-01</span>
+                    </div>
+                    <span id="badge-SENS-BLR-01" class="alert-badge normal">NORMAL</span>
+                </div>
+                <div class="metrics-container">
+                    <div class="metric-box" id="ecoli-box-SENS-BLR-01">
+                        <div class="metric-label">E. Coli MPN</div>
+                        <div class="metric-value">
+                            <span id="ecoli-val-SENS-BLR-01">0.00</span>
+                            <span class="metric-unit">/100mL</span>
+                        </div>
+                    </div>
+                    <div class="metric-box" id="turb-box-SENS-BLR-01">
+                        <div class="metric-label">Turbidity</div>
+                        <div class="metric-value">
+                            <span id="turb-val-SENS-BLR-01">0.00</span>
+                            <span class="metric-unit">NTU</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="station-footer">
+                    <div class="station-coords">📍 12.9406, 77.7466</div>
+                    <div class="station-time" id="time-SENS-BLR-01">Waiting...</div>
+                </div>
+            </div>
+
+            <!-- Hebbal Card -->
+            <div id="card-SENS-BLR-02" class="station-card normal">
+                <div class="station-header">
+                    <div class="station-title">
+                        <h3>Hebbal Reservoir Feed</h3>
+                        <span class="station-id">SENS-BLR-02</span>
+                    </div>
+                    <span id="badge-SENS-BLR-02" class="alert-badge normal">NORMAL</span>
+                </div>
+                <div class="metrics-container">
+                    <div class="metric-box" id="ecoli-box-SENS-BLR-02">
+                        <div class="metric-label">E. Coli MPN</div>
+                        <div class="metric-value">
+                            <span id="ecoli-val-SENS-BLR-02">0.00</span>
+                            <span class="metric-unit">/100mL</span>
+                        </div>
+                    </div>
+                    <div class="metric-box" id="turb-box-SENS-BLR-02">
+                        <div class="metric-label">Turbidity</div>
+                        <div class="metric-value">
+                            <span id="turb-val-SENS-BLR-02">0.00</span>
+                            <span class="metric-unit">NTU</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="station-footer">
+                    <div class="station-coords">📍 13.0359, 77.5978</div>
+                    <div class="station-time" id="time-SENS-BLR-02">Waiting...</div>
+                </div>
+            </div>
+
+            <!-- Kavery Card -->
+            <div id="card-SENS-BLR-03" class="station-card normal">
+                <div class="station-header">
+                    <div class="station-title">
+                        <h3>Kavery Treatment Stage-2</h3>
+                        <span class="station-id">SENS-BLR-03</span>
+                    </div>
+                    <span id="badge-SENS-BLR-03" class="alert-badge normal">NORMAL</span>
+                </div>
+                <div class="metrics-container">
+                    <div class="metric-box" id="ecoli-box-SENS-BLR-03">
+                        <div class="metric-label">E. Coli MPN</div>
+                        <div class="metric-value">
+                            <span id="ecoli-val-SENS-BLR-03">0.00</span>
+                            <span class="metric-unit">/100mL</span>
+                        </div>
+                    </div>
+                    <div class="metric-box" id="turb-box-SENS-BLR-03">
+                        <div class="metric-label">Turbidity</div>
+                        <div class="metric-value">
+                            <span id="turb-val-SENS-BLR-03">0.00</span>
+                            <span class="metric-unit">NTU</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="station-footer">
+                    <div class="station-coords">📍 12.9224, 77.5020</div>
+                    <div class="station-time" id="time-SENS-BLR-03">Waiting...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-body">
+            <!-- Live Chart Card -->
+            <div class="chart-card">
+                <div class="card-title">
+                    <span>Quality Trends Over Time</span>
+                    <div class="card-tabs">
+                        <button id="btn-ecoli" class="tab-btn active" onclick="switchChart('ecoli')">E. Coli Levels</button>
+                        <button id="btn-turb" class="tab-btn" onclick="switchChart('turbidity')">Turbidity Trends</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="liveChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Live Event Log -->
+            <div class="feed-card">
+                <div class="card-title">Live Sensor Event Logs</div>
+                <div class="feed-list" id="feed-list">
+                    <!-- Event logs stream here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Data Structures for Chart
+        const maxDataPoints = 15;
+        const chartData = {
+            'SENS-BLR-01': { label: 'Varthur Intake', ecoli: [], turbidity: [], timestamps: [] },
+            'SENS-BLR-02': { label: 'Hebbal Reservoir', ecoli: [], turbidity: [], timestamps: [] },
+            'SENS-BLR-03': { label: 'Kavery Treatment', ecoli: [], turbidity: [], timestamps: [] }
+        };
+
+        let currentMetric = 'ecoli'; // 'ecoli' or 'turbidity'
+
+        // Chart Initialization
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        
+        const chartConfig = {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Varthur Intake',
+                        data: [],
+                        borderColor: '#0ea5e9',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 3
+                    },
+                    {
+                        label: 'Hebbal Reservoir',
+                        data: [],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 3
+                    },
+                    {
+                        label: 'Kavery Treatment',
+                        data: [],
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } }
+                    }
+                }
+            }
+        };
+
+        const liveChart = new Chart(ctx, chartConfig);
+
+        function switchChart(metric) {
+            currentMetric = metric;
+            document.getElementById('btn-ecoli').classList.toggle('active', metric === 'ecoli');
+            document.getElementById('btn-turb').classList.toggle('active', metric === 'turbidity');
+            
+            updateChartDisplay();
+        }
+
+        function updateChartDisplay() {
+            // Get combined labels (union of timestamps from all stations to align properly)
+            // For simplicity, we align using the station with the most timestamps
+            const stations = Object.keys(chartData);
+            let targetStation = stations[0];
+            for (let s of stations) {
+                if (chartData[s].timestamps.length > chartData[targetStation].timestamps.length) {
+                    targetStation = s;
+                }
+            }
+
+            liveChart.data.labels = chartData[targetStation].timestamps;
+            
+            // Map datasets
+            stations.forEach((stationId, index) => {
+                const dataObj = chartData[stationId];
+                liveChart.data.datasets[index].data = currentMetric === 'ecoli' ? dataObj.ecoli : dataObj.turbidity;
+            });
+
+            liveChart.update('none'); // Update without full animation for performance
+        }
+
+        // Connect to SSE stream hosted by simulator.py
+        const eventSource = new EventSource('/events');
+
+        eventSource.onmessage = function(event) {
+            const payload = JSON.parse(event.data);
+            const stationId = payload.sensor_id;
+            const isContaminated = payload.estimated_mpn_per_100ml > 10.0;
+
+            // 1. Update UI Station Cards
+            const card = document.getElementById(`card-${stationId}`);
+            const badge = document.getElementById(`badge-${stationId}`);
+            const ecoliVal = document.getElementById(`ecoli-val-${stationId}`);
+            const turbVal = document.getElementById(`turb-val-${stationId}`);
+            const timeVal = document.getElementById(`time-${stationId}`);
+
+            ecoliVal.innerText = payload.estimated_mpn_per_100ml.toFixed(2);
+            turbVal.innerText = payload.turbidity_ntu.toFixed(2);
+            
+            // Extract HH:MM:SS from timestamp
+            const timeParts = payload.timestamp.split(' ');
+            timeVal.innerText = timeParts.length > 1 ? timeParts[1] : payload.timestamp;
+
+            const ecoliBox = document.getElementById(`ecoli-box-${stationId}`);
+            const turbBox = document.getElementById(`turb-box-${stationId}`);
+
+            if (isContaminated) {
+                card.className = "station-card contaminated";
+                badge.className = "alert-badge contaminated";
+                badge.innerText = "CONTAMINATED";
+                ecoliBox.classList.add('danger');
+                turbBox.classList.add('danger');
+            } else {
+                card.className = "station-card normal";
+                badge.className = "alert-badge normal";
+                badge.innerText = "NORMAL";
+                ecoliBox.classList.remove('danger');
+                turbBox.classList.remove('danger');
+            }
+
+            // 2. Update Local Chart Data
+            const sData = chartData[stationId];
+            const shortTime = timeParts.length > 1 ? timeParts[1].substring(0, 8) : payload.timestamp;
+
+            sData.ecoli.push(payload.estimated_mpn_per_100ml);
+            sData.turbidity.push(payload.turbidity_ntu);
+            sData.timestamps.push(shortTime);
+
+            if (sData.ecoli.length > maxDataPoints) {
+                sData.ecoli.shift();
+                sData.turbidity.shift();
+                sData.timestamps.shift();
+            }
+
+            updateChartDisplay();
+
+            // 3. Add to live log
+            const feedList = document.getElementById('feed-list');
+            const item = document.createElement('div');
+            item.className = `feed-item ${isContaminated ? 'danger' : 'success'}`;
+            
+            const content = `
+                <div class="feed-item-header">
+                    <span>${payload.station_name}</span>
+                    <span class="feed-item-time">${shortTime}</span>
+                </div>
+                <div class="feed-item-detail">
+                    <span>E. Coli: <span class="feed-val ${isContaminated ? 'highlight' : ''}">${payload.estimated_mpn_per_100ml.toFixed(2)}</span> /100mL</span>
+                    <span>Turbidity: <span class="feed-val">${payload.turbidity_ntu.toFixed(2)}</span> NTU</span>
+                </div>
+            `;
+            item.innerHTML = content;
+            feedList.insertBefore(item, feedList.firstChild);
+
+            // Limit logs in DOM to last 20
+            while (feedList.children.length > 20) {
+                feedList.removeChild(feedList.lastChild);
+            }
+        };
+
+        eventSource.onerror = function() {
+            console.error("SSE connection to simulator failed. Retrying...");
+        };
+    </script>
+</body>
+</html>

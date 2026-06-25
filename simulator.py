@@ -2,6 +2,9 @@ import json
 import os
 import random
 import time
+import queue
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timezone
 
 try:
@@ -22,6 +25,80 @@ except ImportError:
 COLOR_RED = "\033[91m"
 COLOR_GREEN = "\033[92m"
 COLOR_RESET = "\033[0m"
+
+# Dashboard Web Server for Real-Time Streaming
+clients = []
+clients_lock = threading.Lock()
+
+class DashboardHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        # Suppress standard logging to prevent terminal clutter
+        pass
+
+    def do_GET(self):
+        if self.path == "/" or self.path == "/index.html":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            try:
+                file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+                with open(file_path, "rb") as f:
+                    self.wfile.write(f.read())
+            except Exception as e:
+                self.wfile.write(f"Error loading dashboard: {e}".encode("utf-8"))
+        elif self.path == "/events":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            
+            q = queue.Queue(maxsize=100)
+            with clients_lock:
+                clients.append(q)
+            
+            try:
+                while True:
+                    try:
+                        payload = q.get(timeout=5)
+                        self.wfile.write(f"data: {json.dumps(payload)}\n\n".encode("utf-8"))
+                        self.wfile.flush()
+                    except queue.Empty:
+                        self.wfile.write(b": keepalive\n\n")
+                        self.wfile.flush()
+            except (ConnectionResetError, BrokenPipeError):
+                pass
+            finally:
+                with clients_lock:
+                    if q in clients:
+                        clients.remove(q)
+        else:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"Not Found")
+
+def start_dashboard_server():
+    try:
+        server = HTTPServer(("0.0.0.0", 8000), DashboardHandler)
+        print("=" * 70)
+        print("HydroGuard Dashboard running at http://localhost:8000")
+        print("=" * 70)
+        server.serve_forever()
+    except Exception as e:
+        print(f"Failed to start dashboard web server: {e}")
+
+def broadcast_to_dashboard(payload):
+    with clients_lock:
+        for q in list(clients):
+            try:
+                q.put_nowait(payload)
+            except queue.Full:
+                try:
+                    q.get_nowait()
+                    q.put_nowait(payload)
+                except Exception:
+                    pass
 
 
 SENSOR_STATIONS = [
@@ -148,6 +225,10 @@ def main():
     print("HydroGuard Real-Time E. Coli Bio-Sensor Simulator")
     print("=" * 70)
 
+    # Start Dashboard Web Server Thread
+    server_thread = threading.Thread(target=start_dashboard_server, daemon=True)
+    server_thread.start()
+
     producer = None
     kafka_config = build_kafka_config()
     if KAFKA_AVAILABLE and kafka_config:
@@ -185,6 +266,9 @@ def main():
                 f"Est. MPN: {payload['estimated_mpn_per_100ml']}/100mL | "
                 f"Turbidity: {payload['turbidity_ntu']} NTU"
             )
+
+            # Broadcast to web dashboard
+            broadcast_to_dashboard(payload)
 
             if producer:
                 publish(producer, payload)

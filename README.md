@@ -32,15 +32,18 @@ $env:KAFKA_SECURITY_PROTOCOL = "PLAINTEXT"
 
 If `KAFKA_BOOTSTRAP_SERVERS` is not set, the simulator runs in dry-run mode and prints payload summaries only.
 
+When running, the real-time **HydroGuard Web Dashboard** is automatically hosted at [http://localhost:8000](http://localhost:8000).
+
 ## Deploy with Docker Compose (Recommended)
 
-To deploy a local Kafka cluster, the Kafka UI dashboard, and the simulator all at once, run:
+To deploy a local Kafka cluster, the Kafka UI dashboard, the HTML dashboard, and the simulator all at once, run:
 
 ```powershell
 docker compose up --build -d
 ```
 
 Once started:
+- The **Water Quality Web Dashboard** is available at [http://localhost:8000](http://localhost:8000) to visualize real-time contamination levels, trends, and sensor status.
 - The **Kafka Broker** is running locally and accessible on `localhost:9092`.
 - The **Kafka UI** web dashboard is available at [http://localhost:8080](http://localhost:8080) to inspect topics, view active sensor events, and analyze message throughput.
 - The **Simulator** runs in the background, automatically waiting for the broker to start before creating the `telemetry.water.sensors` topic and publishing live water sensor telemetry.

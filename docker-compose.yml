@@ -46,6 +46,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: hydroguard-simulator
+    ports:
+      - "8000:8000"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - KAFKA_TOPIC=telemetry.water.sensors

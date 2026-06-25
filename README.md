@@ -1,6 +1,21 @@
 # HydroGuard Kafka Simulator
 
-Publishes simulated water sensor telemetry to a Kafka topic for downstream Flink SQL processing.
+Publishes simulated water sensor telemetry to a Kafka topic for downstream Flink SQL processing, and hosts a real-time web monitoring dashboard.
+
+## System Architecture
+
+Below is the real-time data ingestion, streaming, and analytics architecture of HydroGuard:
+
+![HydroGuard System Architecture](architecture_diagram.png)
+
+## Application Use Case
+
+Bengaluru's municipal water systems monitor key reservoirs and treatment intakes to ensure public water safety. Hand-sampling is slow, while raw sensor streams can be noisy. HydroGuard provides a complete, modern end-to-end telemetry system:
+
+1.  **Simulation & Ingestion**: Water quality bio-sensors continuously measure Turbidity (suspended solids) and fluorescence to estimate *E. coli* bacteria counts (MPN/100mL).
+2.  **Immediate Monitoring (Local Control Room)**: A light-weight local web dashboard streams data directly from the sensors using **Server-Sent Events (SSE)**, alerting operator panels instantly (Red/Green indicators) when thresholds are breached.
+3.  **Scalable Data Bus**: Ingests high-frequency sensor readings into a **Kafka** topic (`telemetry.water.sensors`), allowing multiple downstream microservices to consume the feed reliably.
+4.  **Temporal Analytics (Apache Flink)**: Downstream Flink SQL groups telemetry into **5-minute tumbling windows**. By checking 5-minute averages, Flink filters out short-lived sensor noise (such as a temporary leaf blocking a lens) and only triggers a **`CRITICAL_CONTAMINATION`** alarm when contamination is sustained.
 
 ## Configure
 

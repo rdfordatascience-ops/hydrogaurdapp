@@ -1,0 +1,22 @@
+# Virtual environment
+venv/
+ENV/
+env/
+.venv/
+
+# Local credentials
+.env
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE configuration
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

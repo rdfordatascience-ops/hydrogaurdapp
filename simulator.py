@@ -18,6 +18,10 @@ try:
     KAFKA_AVAILABLE = True
 except ImportError:
     KAFKA_AVAILABLE = False
+# ANSI escape codes for colored terminal output
+COLOR_RED = "\033[91m"
+COLOR_GREEN = "\033[92m"
+COLOR_RESET = "\033[0m"
 
 
 SENSOR_STATIONS = [
@@ -172,7 +176,10 @@ def main():
     try:
         while True:
             payload = generate_telemetry_payload()
-            status = "[CONTAMINATION]" if payload["estimated_mpn_per_100ml"] > 10.0 else "[NORMAL]"
+            if payload["estimated_mpn_per_100ml"] > 10.0:
+                status = f"{COLOR_RED}[CONTAMINATION]{COLOR_RESET}"
+            else:
+                status = f"{COLOR_GREEN}[NORMAL]{COLOR_RESET}"
             print(
                 f"{status} {payload['station_name']} | "
                 f"Est. MPN: {payload['estimated_mpn_per_100ml']}/100mL | "
